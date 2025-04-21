@@ -1,0 +1,149 @@
+% Example of use of the EEG_source_time_series_simulation toolbox.
+%
+% author = Louise de Wouters
+% contact = louise.dewouters@unige.ch
+% creation date = 2025/04/15
+% version date = 2025/04/15
+%
+%%% Matlab version : R2018b
+%
+%%% Other m-files required:
+% assign_spike_to_baseline_activity.m
+% chose_spiking_source.m
+% get_SNR.m
+% get_template_data.m
+% plot_distribution_on_individual_mri.m
+% plot_source_time_series_simulation.m
+%
+%%% Toolbox required
+% Fieldtrip (https://www.fieldtriptoolbox.org)
+% scalp2sources_path (assigned_label2source_points.m)
+
+clc
+close all
+clear
+
+%% User path specification
+% toolboxes
+fieldtrip_path = 'E:\Matlab\fieldtrip-master';
+scalp2sources_path = 'E:\Matlab\scalp2sources';
+
+% paths
+bids_dir_path = 'Z:\common_resources\template_parcelation';
+folder2save = fullfile('E:\Matlab\EEG_source_time_series_simulation', 'simulation_toolbox');
+save_data = true; % whether to save the data and plots
+speak = true; % whether to let the functions speak
+
+%% Initialisation
+% restoredefaultpath
+% addpath(fieldtrip_path)
+% ft_defaults
+% addpath(genpath(scalp2sources_path));
+
+% check that paths and folders exist
+if ~exist(bids_dir_path, 'dir')
+    error('BIDS path does not exist')
+end
+if ~exist(folder2save, 'dir')
+    mkdir(folder2save)
+end
+
+%% Load data
+ROI = 'ctx-rh-middletemporal_2 '; % ROI of interest
+ROI = 'right-hippocampus';
+[mri, leadfield, inverse_filters, source_positions, sources_in_the_target_region] = get_template_data(bids_dir_path, ROI);
+
+%% Parameters
+
+% step 1 - to build the time-series, baseline and spike
+nb_of_sources = size(source_positions, 1);
+nb_of_orientations = 3;
+T = 4; % in s
+Fs = 250; % in Hz
+spike_duration = 0.1; % in s
+noise_colour = 'pink';
+% build the HP filter for the baseline
+f = 1; % in Hz
+filter_order = 4;
+[B, A] = butter(filter_order, f/(Fs/2), 'high');
+
+% step 2 - to assign the spike to the baseline, taking into account the source positions
+spike_ori = 'random';
+spread = 15; % in mm
+spike_source = chose_spiking_source(source_positions, sources_in_the_target_region, ...
+    spread, speak);
+weighting_func = @(dist) 0.5*(1-cos(2*pi.*dist./(2*spread)+pi)); % hann window
+L = cat(2,leadfield.leadfield{:}); % leadfield matrix
+
+% step 3 - test inverse solution
+W = cat(1,inverse_filters.filter{:}); % inverse matrix
+
+%% Example 1 - Simulate in the entire source space, defining the SNR at the scalp level
+source_SNR = [];
+scalp_SNR = 5;
+
+% step 1 - create the time-series for the baseline and the spike trace
+[source_baseline_activity, spike_trace, source_baseline_activity_before_filtering, ...
+    spike_start, spike_end] = simulate_spikes(nb_of_sources, nb_of_orientations, ...
+    T, Fs, spike_duration, [], [], noise_colour, [B; A], speak);
+
+% step 2 - assign the spike trace to the sources, using their positions
+[source_activity, spiking_source_id, a, spike_polarity, weights] = assign_spike_to_baseline_activity(source_baseline_activity, ...
+	spike_trace, nb_of_sources, nb_of_orientations, spike_source, spike_ori, ...
+    source_positions, weighting_func, spread, sources_in_the_target_region, ...
+    source_SNR, scalp_SNR, L, speak);
+
+% plot the results
+plot_source_time_series_simulation(spike_source, spiking_source_id, nb_of_sources, ...
+    T, Fs, source_baseline_activity_before_filtering, source_baseline_activity, ...
+    source_activity, spike_polarity*spike_trace, source_positions, sources_in_the_target_region, ...
+    weighting_func, spread, weights, leadfield, mri, save_data, 'example_scalpSNR', ...
+    folder2save, 'png')
+
+% calculate the effective SNRs
+obs_source_SNR = get_SNR(source_activity, [spike_start spike_end]);
+fprintf(['\Observed source SNR = ' num2str(obs_source_SNR) ' (desired: ' num2str(source_SNR) ')'])
+if ~isempty(L)
+    eeg_activity = L*source_activity;
+    eff_scalp_SNR = get_SNR(eeg_activity, [spike_start spike_end]);
+    fprintf(['\nObserved scalp SNR = ' num2str(eff_scalp_SNR) ' (desired: ' num2str(scalp_SNR) ')'])
+end
+fprintf('\n')
+
+% step 3 - reconstruct source activity
+if ~isempty(L) && ~isempty(W)
+    reconstructed_source_activity = W*eeg_activity;
+    plot_real_and_reconstructed_activities(spike_source, spiking_source_id, ...
+        nb_of_sources, T, Fs, source_activity, eeg_activity, reconstructed_source_activity, ...
+        [spike_start spike_end], save_data, 'example_scalpSNR', folder2save, ...
+        'png')
+end
+
+%% Example 2 - Simulate only in a ROI (only source_SNR can be defined in this case)
+source_SNR = 100;
+scalp_SNR = [];
+% the source space becomes only the ROI
+source_positions_ROI = source_positions(sources_in_the_target_region, :);
+nb_of_sources_in_ROI = size(source_positions_ROI, 1);
+spike_source_in_ROI = 'random';
+
+% step 1 - create the time-series for the baseline and the spike trace
+[source_baseline_activity, spike_trace, source_baseline_activity_before_filtering, ...
+    spike_start, spike_end] = simulate_spikes(nb_of_sources_in_ROI, nb_of_orientations, ...
+    T, Fs, spike_duration, source_SNR, [], noise_colour, [B; A], speak);
+
+% step 2 - assign the spike trace to the sources, using their positions
+[source_activity, spiking_source_id, a, spike_polarity, weights] = assign_spike_to_baseline_activity(source_baseline_activity, ...
+	spike_trace, nb_of_sources_in_ROI, nb_of_orientations, spike_source_in_ROI, ...
+    spike_ori, source_positions_ROI, weighting_func, spread, [], source_SNR, ...
+    scalp_SNR, [], speak);
+
+% plot the results
+plot_source_time_series_simulation(spike_source_in_ROI, spiking_source_id, nb_of_sources_in_ROI, ...
+    T, Fs, source_baseline_activity_before_filtering, source_baseline_activity, ...
+    source_activity, spike_polarity*spike_trace, source_positions_ROI, [], ...
+    weighting_func, spread, weights, leadfield, mri, save_data, 'example_sourceSNR', folder2save, 'png')
+
+% calculate the effective SNR
+obs_source_SNR = get_SNR(source_activity, [spike_start spike_end]);
+fprintf(['\nObserved source SNR = ' num2str(obs_source_SNR) ' (desired: ' num2str(source_SNR) ')\n'])
