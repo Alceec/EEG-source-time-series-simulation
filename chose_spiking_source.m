@@ -1,17 +1,24 @@
 function spike_source = chose_spiking_source(source_positions, sources_in_the_target_region, ...
-    spread, speak)
+    varargin)
     % INPUTS
+    % - required - 
     %   source_positions = positions of the sources in the ROIs or the source space 
     %       (nb_of_sources x 3).
     %   sources_in_the_target_region = subset of the source space
     %       corresponding for example to one ROI. If defined, the spike will 
     %       be constrained to this region.
+    % - optional -
     %   spread = spatial spread of the spike, i.e., radius around the spike 
-    %       centre that constrain the spike presence (cm).
-    %   speak = whether to let the function speak or not.
+    %       centre that constrain the spike presence (cm) (default = 15cm).
+    %   speak = whether to let the function speak or not (default = true).
     % OUTPUT
     %   spike_source = ID of the source to which the spike centre will be 
     %       assigned.
+    
+    % get the optional arguments, and using default values if not included
+    % (based on Fieltrip function)
+    spread = ft_getopt(varargin, 'spread', 15);
+    speak = ft_getopt(varargin, 'speak', true);
     
     if speak
         fprintf('\nChosing the spike centre...')

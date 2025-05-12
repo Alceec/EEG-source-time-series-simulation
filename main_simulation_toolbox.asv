@@ -31,7 +31,7 @@ scalp2sources_path = 'E:\Matlab\scalp2sources';
 
 % paths
 bids_dir_path = '\\129.195.132.250\Users\Louise_de_Wouters\Data\gsp_raw_data';
-folder2save = fullfile('E:\Matlab\EEG_source_time_series_simulation', 'simulation_examples');
+folder2save = fullfile('E:\Matlab\EEG_source_time_series_simulation', 'simulation_toolbox');
 save_data = true; % whether to save the data and plots
 
 %% Initialisation
@@ -69,7 +69,7 @@ L = cat(2,leadfield.leadfield{:}); % leadfield matrix
 % step 3 - to test inverse solution
 W = cat(1,inverse_filters.filter{:}); % inverse matrix
 
-% (for the plots - these are the default values used in the functions)
+% (for the plots - we declare the default values that are used in the functions)
 T = 4;
 Fs = 250;
 spread = 15; 

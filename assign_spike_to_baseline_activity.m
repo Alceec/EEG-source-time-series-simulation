@@ -1,27 +1,31 @@
 function [source_activity, spiking_source_id, a, spike_polarity, weights] = assign_spike_to_baseline_activity(source_baseline_activity, ...
-	spike_trace, nb_of_sources, nb_of_orientations, spike_source, spike_ori, source_positions, ...
-    weighting_func, spread, sources_in_the_target_region, source_SNR, scalp_SNR, ...
-    L, speak)
+    spike_trace, source_positions, varargin)
     % INPUTS
+    % - required - 
     %   source_baseline_activity = set of time-series containing the baseline
     %       activity (nb_of_sources*nb_of_orientations x T*Fs). Output of
     %       simulate_spikes().
     %   spike_trace = one time-series containing the spike pattern (1 x
     %       T*Fs). Output of simulate_spikes().
-    %   nb_of_sources = number of sources.
-    %   nb_of_orientations = number of orientations.
+    %   source_positions = positions of the sources in the ROIs or the source space 
+    %       (nb_of_sources x 3).
+    % - optional -
+    %   nb_of_sources = number of sources (default = number of time-series
+    %       /nb_of_orientations).
+    %   nb_of_orientations = number of orientations (default = 3).
     %   spike_source = how to assign the spike in the sources. 'none' = no
     %       spike, 'all' = in all source, 'random' = the spike centre is 
     %       randomly chosen among the sources. spiking_source can also be 
-    %       an integer, corresponding to the spike centre.
-    %   spike_ori = orientation of the spike. It should be 'nan' (meaning the
+    %       an integer, corresponding to the spike centre. (Default =
+    %       'random').
+    %   spike_ori = orientation of the spike. It should be 'random' (meaning the
     %       orientation will be random) or between [1, nb_of_orientations].
-    %   source_positions = positions of the sources in the ROIs or the source space 
-    %       (nb_of_sources x 3).
+    %       (Default = 'ramdom').
     %	weighting_func = spike weighting function, i.e., how to
     %       weight the spike amplitude with distance from the spike centre.
+    %       (Default = semi-hann window)
     %   spread = spatial spread of the spike, i.e., radius around the spike 
-    %       centre that constrain the spike presence (cm).
+    %       centre that constrain the spike presence (cm) (Default = 15cm).
     %   sources_in_the_target_region = subset of the source space
     %       corresponding for example to one ROI. If defined, the spike will 
     %       be constrained to this region.
@@ -44,9 +48,19 @@ function [source_activity, spiking_source_id, a, spike_polarity, weights] = assi
     %   weights = weights of the spike amplitude in each source, between
     %       [0, 1] (nb_of_sources x 1).
     
-    if speak
-        fprintf('\nAssigning spike to baseline activity...')
-    end
+    % get the optional arguments, and using default values if not included
+    % (based on Fieltrip function)
+    nb_of_orientations = ft_getopt(varargin, 'nb_of_orientations', 3);
+    nb_of_sources = ft_getopt(varargin, 'nb_of_sources', size(source_baseline_activity, 1)/nb_of_orientations);
+    spike_source = ft_getopt(varargin, 'spike_source', 'random');
+    spike_ori = ft_getopt(varargin, 'spike_ori', 'random');
+    spread = ft_getopt(varargin, 'spread', 15);
+    weighting_func = ft_getopt(varargin, 'spike_ori', @(dist) 0.5*(1-cos(2*pi.*dist./(2*spread)+pi)));
+    sources_in_the_target_region = ft_getopt(varargin, 'sources_in_the_target_region', []);
+    source_SNR = ft_getopt(varargin, 'source_SNR', []);
+    scalp_SNR = ft_getopt(varargin, 'scalp_SNR', []);
+    L = ft_getopt(varargin, 'L', []);
+    speak = ft_getopt(varargin, 'speak', 'true');
     
     % check inputs
     if size(source_baseline_activity, 1) ~= nb_of_sources*nb_of_orientations
@@ -65,6 +79,10 @@ function [source_activity, spiking_source_id, a, spike_polarity, weights] = assi
         warning('The SNR at the scalp level is defined but the leadfield matrix is missing. The scalp SNR will be ignored.')
     elseif isempty(scalp_SNR) && ~isempty(L)
         warning('This is useless to define the leadfield matrix L without the desired scalp SNR. L will be ignored.')   
+    end
+    
+    if speak
+        fprintf('\nAssigning spike to baseline activity...')
     end
     
     spike_ids = find(spike_trace);

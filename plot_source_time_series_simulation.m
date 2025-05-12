@@ -91,13 +91,13 @@ function plot_source_time_series_simulation(spike_source, spiking_source_id, ...
         source2plot = rmfield(leadfield, {'leadfield', 'label', 'leadfielddimord', 'cfg'});
         source2plot.pow = weights_all;
         plot_distribution_on_individual_mri(source2plot, mri, 'pow', 'nearest', 'ortho')
-        saveas(gcf, fullfile(folder2save, [saving_prefix ' Localisation of the simulated source spike.png']))
+        saveas(gcf, fullfile(folder2save, [saving_prefix 'Localisation of the simulated source spike.png']))
         if save_data
             if strcmp(format, 'all')
-                saveas(gcf, fullfile(folder2save, [saving_prefix ' Localisation of the simulated source spike.png']))
-                saveas(gcf, fullfile(folder2save, [saving_prefix ' Localisation of the simulated source spike.svg']))
+                saveas(gcf, fullfile(folder2save, [saving_prefix 'Localisation of the simulated source spike.png']))
+                saveas(gcf, fullfile(folder2save, [saving_prefix 'Localisation of the simulated source spike.svg']))
             else
-                saveas(gcf, fullfile(folder2save, [saving_prefix ' Localisation of the simulated source spike.' format]))
+                saveas(gcf, fullfile(folder2save, [saving_prefix 'Localisation of the simulated source spike.' format]))
             end
         end
     end
